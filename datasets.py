@@ -225,5 +225,80 @@ def load_dataset(name: str):
 
         return BaseGraph(x, edge_index, torch.ones(edge_index.shape[1]), pos,
                          label.to(torch.float), mask)
+    
+    elif name == "elliptic":
+
+        multilabel = False  # Initialize multilabel here in the enclosing scope
+
+        def read_subgraphs(sub_f, split=True):
+            nonlocal multilabel  # Ensure this is declared if it's used within this function
+            label_idx = 0
+            labels = {}
+            train_sub_G, val_sub_G, test_sub_G = [], [], []
+            train_sub_G_label, val_sub_G_label, test_sub_G_label = [], [], []
+            train_mask, val_mask, test_mask = [], [], []
+            with open(sub_f) as fin:
+                subgraph_idx = 0
+                for line in fin:
+                    nodes = [int(n) for n in line.split("\t")[0].split("-") if n != ""]
+                    if len(nodes) != 0:
+                        if len(nodes) == 1:
+                            print(nodes)
+                        l = line.split("\t")[1].split("-")
+                        if len(l) > 1:
+                            multilabel = True  # Modify the nonlocal variable
+                        for lab in l:
+                            if lab not in labels:
+                                labels[lab] = label_idx
+                                label_idx += 1
+                        if line.split("\t")[2].strip() == "train":
+                            train_sub_G.append(nodes)
+                            train_sub_G_label.append([labels[lab] for lab in l])
+                            train_mask.append(subgraph_idx)
+                        elif line.split("\t")[2].strip() == "val":
+                            val_sub_G.append(nodes)
+                            val_sub_G_label.append([labels[lab] for lab in l])
+                            val_mask.append(subgraph_idx)
+                        elif line.split("\t")[2].strip() == "test":
+                            test_sub_G.append(nodes)
+                            test_sub_G_label.append([labels[lab] for lab in l])
+                            test_mask.append(subgraph_idx)
+                        subgraph_idx += 1
+
+            # Check conditions to decide what to return
+            if not multilabel:
+                train_sub_G_label = torch.tensor(train_sub_G_label).squeeze()
+                val_sub_G_label = torch.tensor(val_sub_G_label).squeeze()
+                test_sub_G_label = torch.tensor(test_sub_G_label).squeeze()
+
+            # Make sure to return values for all conditions
+            return train_sub_G, train_sub_G_label, val_sub_G, val_sub_G_label, test_sub_G, test_sub_G_label
+
+        train_sub_G, train_sub_G_label, val_sub_G, val_sub_G_label, test_sub_G, test_sub_G_label = read_subgraphs(
+            f"./dataset/{name}/subgraphs.pth")
+        torch.save(train_sub_G, f"./dataset/{name}/train_sub_G.pt")
+        torch.save(train_sub_G_label, f"./dataset/{name}/train_sub_G_label.pt")
+        torch.save(val_sub_G, f"./dataset/{name}/val_sub_G.pt")
+        torch.save(val_sub_G_label, f"./dataset/{name}/val_sub_G_label.pt")
+        torch.save(test_sub_G, f"./dataset/{name}/test_sub_G.pt")
+        torch.save(test_sub_G_label, f"./dataset/{name}/test_sub_G_label.pt")
+        mask = torch.cat(
+            (torch.zeros(len(train_sub_G_label), dtype=torch.int64),
+            torch.ones(len(val_sub_G_label), dtype=torch.int64),
+            2 * torch.ones(len(test_sub_G_label), dtype=torch.int64)),
+            dim=0)
+        pos = pad_sequence(
+            [torch.tensor(i) for i in train_sub_G + val_sub_G + test_sub_G],
+            batch_first=True,
+            padding_value=-1)
+        rawedge = nx.read_edgelist(f"./dataset/{name}/edge_list.txt").edges
+        edge_index = torch.tensor([[int(i[0]), int(i[1])]
+                                for i in rawedge]).t()
+        num_node = max([torch.max(pos), torch.max(edge_index)]) + 1
+        x = torch.empty((num_node, 1, 0))
+        print("dataset read successfully!")
+
+        return BaseGraph(x, edge_index, torch.ones(edge_index.shape[1]), pos, mask.to(torch.float), mask)
+
     else:
         raise NotImplementedError()
