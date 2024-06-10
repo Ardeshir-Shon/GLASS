@@ -225,7 +225,6 @@ def load_dataset(name: str):
 
         return BaseGraph(x, edge_index, torch.ones(edge_index.shape[1]), pos,
                          label.to(torch.float), mask)
-    
     elif name == "elliptic":
 
         multilabel = False  # Initialize multilabel here in the enclosing scope
@@ -299,6 +298,5 @@ def load_dataset(name: str):
         print("dataset read successfully!")
 
         return BaseGraph(x, edge_index, torch.ones(edge_index.shape[1]), pos, mask.to(torch.float), mask)
-
     else:
         raise NotImplementedError()
