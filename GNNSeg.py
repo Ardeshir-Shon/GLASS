@@ -9,7 +9,8 @@ from torch_geometric.nn import GCNConv, GraphNorm, GINConv
 import functools
 import numpy as np
 from torch_geometric.data import InMemoryDataset, Data
-from torch_geometric.data.dataloader import DataLoader as pygDataloader
+# from torch_geometric.data.dataloader import DataLoader as pygDataloader
+from torch_geometric.loader import DataLoader as pygDataloader
 from torch_geometric.utils import k_hop_subgraph
 import torch.nn.functional as F
 
@@ -234,19 +235,26 @@ def split():
     global trn_dataset, val_dataset, tst_dataset, loader_fn, tloader_fn, input_channels
     if args.dataset in ["hpo_metab", "hpo_neuro", "ppi_bp", "em_user"]:
         baseG.addDegreeFeature()
-    elif args.dataset in ["component", "coreness", "density", "cut_ratio"]:
+    elif args.dataset in ["component", "coreness", "density", "cut_ratio","elliptic"]:
+        print("one feature strategy start")
         baseG.addOneFeature()
+        print("one feature strategy end")
     else:
         raise NotImplementedError
+    print(baseG.x.shape)
     input_channels = baseG.x.shape[-1]
     baseG.to(config.device)
     trn_dataset = SubGDataset.GDataset(*baseG.get_split("train"))
     val_dataset = SubGDataset.GDataset(*baseG.get_split("valid"))
     tst_dataset = SubGDataset.GDataset(*baseG.get_split("test"))
 
+    print("dataset loaded")
+
     trn_dataset = GsDataset(todatalist(trn_dataset, 0))
     val_dataset = GsDataset(todatalist(val_dataset, 0))
     tst_dataset = GsDataset(todatalist(tst_dataset, 0))
+
+    print("dataset split")
 
     def tfunc(ds, bs, shuffle=True, drop_last=True):
         return GsDataloader(ds, bs, shuffle=shuffle, drop_last=drop_last)
@@ -384,6 +392,11 @@ best_hyperparams = {
     'em_user': {
         'conv_layer': 1,
         'dropout': 0.4,
+        'hidden_dim': 64
+    },
+    'elliptic': {
+        'conv_layer': 2,
+        'dropout': 0.1,
         'hidden_dim': 64
     }
 }
